@@ -576,6 +576,25 @@ def test_read_database_alchemy_textclause(sqlite_engine: Engine) -> None:
             assert_frame_equal(batches[0], expected)
 
 
+def test_read_database_alchemy_without_asyncio_extra(
+    sqlite_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # `sqlalchemy.ext.asyncio` has optional dependencies; synchronous connections
+    # must still work when that module cannot be imported
+    monkeypatch.setitem(sys.modules, "sqlalchemy.ext.asyncio", None)
+
+    expected = pl.DataFrame({"n": [1]})
+    with (
+        sessionmaker(bind=sqlite_engine)() as alchemy_session,
+        sqlite_engine.connect() as alchemy_conn,
+    ):
+        for conn in (alchemy_session, sqlite_engine, alchemy_conn):
+            assert_frame_equal(
+                pl.read_database("SELECT 1 AS n", connection=conn),
+                expected,
+            )
+
+
 @pytest.mark.parametrize(
     ("param", "param_value"),
     [
